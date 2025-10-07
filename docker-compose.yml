@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    env_file:
+      - .env
+    environment:
+      APP_PORT: ${APP_PORT:-8000}
+    volumes:
+      - app_data:/data
+    networks:
+      - backend
+    ports:
+      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25-alpine
+    depends_on:
+      - app
+    env_file:
+      - .env
+    environment:
+      APP_PORT: ${APP_PORT:-8000}
+      DOMAIN: ${DOMAIN}
+      SERVER_NAME: ${SERVER_NAME}
+      SSL_CERT_PATH: ${SSL_CERT_PATH}
+      SSL_KEY_PATH: ${SSL_KEY_PATH}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    command: >
+      /bin/sh -c "envsubst '\$${APP_PORT} \$${DOMAIN} \$${SERVER_NAME} \$${SSL_CERT_PATH} \$${SSL_KEY_PATH}'
+      < /etc/nginx/templates/app.conf.template
+      > /etc/nginx/conf.d/app.conf
+      && nginx -g 'daemon off;'"
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - backend
+    restart: unless-stopped
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  app_data:
+    driver: local
