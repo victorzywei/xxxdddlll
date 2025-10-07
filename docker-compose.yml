@@ -9,6 +9,7 @@ services:
       APP_PORT: ${APP_PORT:-8000}
     volumes:
       - app_data:/data
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - backend
     ports:
