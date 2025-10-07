@@ -42,13 +42,17 @@ class Settings(BaseSettings):
     alipay_app_private_key_pem: str | None = None
     alipay_public_key_pem: str | None = None
 
+    def _normalized_base_url(self) -> str:
+        """Return base URL without trailing slash for consistent concatenation."""
+        return str(self.base_url).rstrip("/")
+
     @property
     def notify_url(self) -> str:
-        return f"{self.base_url.rstrip('/')}{self.alipay_notify_path}"
+        return f"{self._normalized_base_url()}{self.alipay_notify_path}"
 
     @property
     def return_url(self) -> str:
-        return f"{self.base_url.rstrip('/')}{self.alipay_return_path}"
+        return f"{self._normalized_base_url()}{self.alipay_return_path}"
 
     @property
     def cors_origin_list(self) -> List[str]:
