@@ -83,6 +83,14 @@ def create_payment_order(db: Session, payload: PaymentCreateRequest) -> Dict[str
     return {"out_trade_no": order.out_trade_no, "pay_url": pay_url}
 
 
+def get_payment_order(db: Session, out_trade_no: str) -> PaymentOrder:
+    stmt = select(PaymentOrder).filter_by(out_trade_no=out_trade_no)
+    order = db.execute(stmt).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Order not found.")
+    return order
+
+
 def handle_sync_return(db: Session, query_params: Mapping[str, str]) -> PaymentOrder:
     if not _verify_signature(query_params):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid signature.")
@@ -91,10 +99,7 @@ def handle_sync_return(db: Session, query_params: Mapping[str, str]) -> PaymentO
     if not out_trade_no:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Missing out_trade_no.")
 
-    stmt = select(PaymentOrder).filter_by(out_trade_no=out_trade_no)
-    order = db.execute(stmt).scalar_one_or_none()
-    if not order:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Order not found.")
+    order = get_payment_order(db, out_trade_no)
 
     order.mark_processing()
     db.add(order)
@@ -107,10 +112,7 @@ def handle_async_notification(db: Session, payload: PaymentNotification, raw_for
     if not _verify_signature(raw_form):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Invalid signature.")
 
-    stmt = select(PaymentOrder).filter_by(out_trade_no=payload.out_trade_no)
-    order = db.execute(stmt).scalar_one_or_none()
-    if not order:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Order not found.")
+    order = get_payment_order(db, payload.out_trade_no)
 
     if payload.trade_status in ALIPAY_SUCCESS_STATUSES:
         order.mark_succeeded(trade_no=payload.trade_no, buyer_logon_id=payload.buyer_logon_id)

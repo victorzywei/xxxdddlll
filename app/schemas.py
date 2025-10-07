@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
 
@@ -32,3 +33,17 @@ class PaymentNotification(BaseModel):
     total_amount: Decimal
     trade_status: str
     buyer_logon_id: Optional[str] = None
+
+
+class PaymentOrderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    out_trade_no: str
+    subject: str
+    total_amount: Decimal
+    channel: str
+    status: str
+    trade_no: Optional[str] = None
+    buyer_logon_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime

@@ -15,6 +15,7 @@ from .schemas import (
     PaymentCreateRequest,
     PaymentCreateResponse,
     PaymentNotification,
+    PaymentOrderResponse,
 )
 from .services import payment as payment_service
 
@@ -95,3 +96,9 @@ async def alipay_notify(request: Request, db: Session = Depends(get_db)) -> Plai
     payload = PaymentNotification(**raw_payload)
     payment_service.handle_async_notification(db, payload, raw_payload)
     return PlainTextResponse("success")
+
+
+@app.get("/pay/order/{out_trade_no}", response_model=PaymentOrderResponse)
+def get_payment_order(out_trade_no: str, db: Session = Depends(get_db)) -> PaymentOrderResponse:
+    order = payment_service.get_payment_order(db, out_trade_no)
+    return PaymentOrderResponse.model_validate(order)
