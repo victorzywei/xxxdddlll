@@ -142,19 +142,24 @@ def handle_async_notification(db: Session, payload: PaymentNotification, raw_for
 
     order = get_payment_order(db, payload.out_trade_no)
 
+    authing_success: bool | None = None
+
     if payload.trade_status in ALIPAY_SUCCESS_STATUSES:
         order.mark_paid(trade_no=payload.trade_no, buyer_logon_id=payload.buyer_logon_id)
+
+        try:
+            authing_success = update_membership_for_order(order)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Authing update failed for order %s: %s", order.out_trade_no, exc)
+            authing_success = False
     else:
         order.mark_failed()
+
+    if authing_success is not None:
+        order.authingpost = authing_success
 
     db.add(order)
     db.commit()
     db.refresh(order)
-
-    if order.status == PaymentStatus.paid:
-        try:
-            update_membership_for_order(order)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Authing update failed for order %s: %s", order.out_trade_no, exc)
 
     return order

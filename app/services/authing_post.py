@@ -104,11 +104,11 @@ def update_preferred_username(user_id: str, preferred_username: str, token: str)
     }
 
 
-def update_membership_for_order(order: PaymentOrder) -> Optional[Dict[str, Any]]:
+def update_membership_for_order(order: PaymentOrder) -> bool:
     user_info = order.user_info or {}
     if not isinstance(user_info, MutableMapping):
         logger.warning("Order %s user_info is not a mapping; skip Authing update.", order.out_trade_no)
-        return None
+        return False
 
     user_id = _read_first(user_info, ("sub", "userId", "id"))
     id_token = _read_first(user_info, ("id_token", "idToken", "token"))
@@ -116,18 +116,18 @@ def update_membership_for_order(order: PaymentOrder) -> Optional[Dict[str, Any]]
 
     if not user_id or not id_token:
         logger.warning("Missing Authing credentials in user_info for order %s; skip.", order.out_trade_no)
-        return None
+        return False
 
     offset_secret = os.getenv("AUTHING_OFFSET_SECRET")
     hmac_secret = os.getenv("AUTHING_HMAC_SECRET")
     if not offset_secret or not hmac_secret:
         logger.warning("Authing membership secrets not configured; skipping update for order %s.", order.out_trade_no)
-        return None
+        return False
 
     recipe = _extract_membership_recipe(order)
     if not recipe:
         logger.warning("Unable to locate membership recipe for order %s; skip Authing update.", order.out_trade_no)
-        return None
+        return False
 
     now_hour = _now_utc_hour()
     current_expire: Optional[HourString] = None
@@ -147,7 +147,7 @@ def update_membership_for_order(order: PaymentOrder) -> Optional[Dict[str, Any]]
         new_expire = recipe.compute_new_expiry(current_expire=current_expire, now_hour=now_hour)
     except Exception as exc:  # noqa: BLE001
         logger.error("Unable to compute new membership expiry for order %s: %s", order.out_trade_no, exc)
-        return None
+        return False
 
     extra_days = max(getattr(order, "recharge_days", 0) or 0, 0)
     if extra_days:
@@ -160,22 +160,28 @@ def update_membership_for_order(order: PaymentOrder) -> Optional[Dict[str, Any]]
                 order.out_trade_no,
                 exc,
             )
-            return None
+            return False
 
     try:
         new_token = encode_membership("0", "0", now_hour, new_expire, offset_secret, hmac_secret)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to encode membership token for order %s: %s", order.out_trade_no, exc)
-        return None
+        return False
 
     response = update_preferred_username(user_id=user_id, preferred_username=new_token, token=id_token)
 
-    if response.get("ok"):
-        logger.info("Updated Authing preferred_username for user %s via order %s.", user_id, order.out_trade_no)
-    else:
-        logger.error("Authing update failed for user %s via order %s: %s", user_id, order.out_trade_no, response)
+    success = bool(response.get("ok"))
+    if success:
+        logger.info(
+            "Updated Authing preferred_username for user %s via order %s with expiry %s.",
+            user_id,
+            order.out_trade_no,
+            new_expire,
+        )
+        return True
 
-    return {"new_token": new_token, "response": response}
+    logger.error("Authing update failed for user %s via order %s: %s", user_id, order.out_trade_no, response)
+    return False
 
 
 def _read_first(data: MutableMapping[str, Any], keys: Iterable[str]) -> Optional[Any]:
