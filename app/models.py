@@ -15,6 +15,7 @@ from .database import Base
 class PaymentStatus(str, enum.Enum):
     pending = "pending"
     processing = "processing"
+    paid = "paid"
     succeeded = "succeeded"
     failed = "failed"
 
@@ -43,10 +44,13 @@ class PaymentOrder(Base):
     def mark_processing(self) -> None:
         self.status = PaymentStatus.processing
 
-    def mark_succeeded(self, trade_no: str, buyer_logon_id: str | None = None) -> None:
-        self.status = PaymentStatus.succeeded
+    def mark_paid(self, trade_no: str, buyer_logon_id: str | None = None) -> None:
+        self.status = PaymentStatus.paid
         self.trade_no = trade_no
         self.buyer_logon_id = buyer_logon_id
+
+    def mark_succeeded(self, trade_no: str, buyer_logon_id: str | None = None) -> None:
+        self.mark_paid(trade_no=trade_no, buyer_logon_id=buyer_logon_id)
 
     def mark_failed(self) -> None:
         self.status = PaymentStatus.failed

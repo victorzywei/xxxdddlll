@@ -131,13 +131,7 @@ def handle_sync_return(db: Session, query_params: Mapping[str, str]) -> PaymentO
     if not out_trade_no:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Missing out_trade_no.")
 
-    order = get_payment_order(db, out_trade_no)
-
-    order.mark_processing()
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-    return order
+    return get_payment_order(db, out_trade_no)
 
 
 def handle_async_notification(db: Session, payload: PaymentNotification, raw_form: Mapping[str, str]) -> PaymentOrder:
@@ -147,7 +141,7 @@ def handle_async_notification(db: Session, payload: PaymentNotification, raw_for
     order = get_payment_order(db, payload.out_trade_no)
 
     if payload.trade_status in ALIPAY_SUCCESS_STATUSES:
-        order.mark_succeeded(trade_no=payload.trade_no, buyer_logon_id=payload.buyer_logon_id)
+        order.mark_paid(trade_no=payload.trade_no, buyer_logon_id=payload.buyer_logon_id)
     else:
         order.mark_failed()
 

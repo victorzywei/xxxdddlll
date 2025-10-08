@@ -138,3 +138,8 @@
 - 异步通知为最终支付结果；同步回跳仅用于展示。
 - SQLite 文件持久化于命名卷 `app_data`（容器内 `/data/app.db`）。
 - Nginx 默认启用 HTTP/2 与 HSTS，请确保证书有效并及时续期。
+
+
+
+## 订单查询
+- https://servapi.8777778.xyz/pay/order/{out_trade_no}
