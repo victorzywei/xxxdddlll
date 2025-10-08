@@ -82,6 +82,9 @@ def create_payment_order(db: Session, payload: PaymentCreateRequest) -> Dict[str
         subject=payload.subject,
         total_amount=amount,
         channel=payload.channel,
+        description=payload.description,
+        payment_method=payload.payment_method,
+        user_info=payload.user_info.model_dump(),
         status=PaymentStatus.pending,
     )
     db.add(order)

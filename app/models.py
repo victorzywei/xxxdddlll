@@ -3,9 +3,10 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Enum, Numeric, String
+from sqlalchemy import DateTime, Enum, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -26,6 +27,9 @@ class PaymentOrder(Base):
     subject: Mapped[str] = mapped_column(String(128))
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     channel: Mapped[str] = mapped_column(String(16))
+    description: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    payment_method: Mapped[str] = mapped_column(String(32), default="alipay")
+    user_info: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     status: Mapped[PaymentStatus] = mapped_column(Enum(PaymentStatus), default=PaymentStatus.pending)
     trade_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
     buyer_logon_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
