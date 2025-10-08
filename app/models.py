@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Enum, JSON, Numeric, String
+from sqlalchemy import DateTime, Enum, JSON, Numeric, String, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -26,6 +26,7 @@ class PaymentOrder(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     out_trade_no: Mapped[str] = mapped_column(String(64), unique=True, index=True, default=lambda: uuid4().hex)
     subject: Mapped[str] = mapped_column(String(128))
+    recharge_days: Mapped[int] = mapped_column(Integer, default=0)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     channel: Mapped[str] = mapped_column(String(16))
     description: Mapped[str | None] = mapped_column(String(256), nullable=True)

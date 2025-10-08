@@ -143,3 +143,7 @@
 
 ## шовхНХцЯешпв
 - https://servapi.8777778.xyz/pay/order/{out_trade_no}
+## Authing ╕№╨┬
+- `AUTHING_USERPOOL_ID`
+- `AUTHING_OFFSET_SECRET`
+- `AUTHING_HMAC_SECRET`

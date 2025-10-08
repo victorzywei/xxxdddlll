@@ -16,6 +16,7 @@ from ..alipay_client import AlipayConfigurationError, get_alipay_client
 from ..config import get_settings
 from ..models import PaymentOrder, PaymentStatus
 from ..schemas import PaymentCreateRequest, PaymentNotification
+from .authing_post import update_membership_for_order
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -80,6 +81,7 @@ def create_payment_order(db: Session, payload: PaymentCreateRequest) -> Dict[str
 
     order = PaymentOrder(
         subject=payload.subject,
+        recharge_days=payload.recharge_days,
         total_amount=amount,
         channel=payload.channel,
         description=payload.description,
@@ -148,4 +150,11 @@ def handle_async_notification(db: Session, payload: PaymentNotification, raw_for
     db.add(order)
     db.commit()
     db.refresh(order)
+
+    if order.status == PaymentStatus.paid:
+        try:
+            update_membership_for_order(order)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Authing update failed for order %s: %s", order.out_trade_no, exc)
+
     return order

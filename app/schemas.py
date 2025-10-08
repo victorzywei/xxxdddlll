@@ -8,6 +8,8 @@ from pydantic.config import ConfigDict
 
 
 class UserInfo(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     name: str
     preferred_username: str
     email: EmailStr
@@ -18,6 +20,7 @@ class UserInfo(BaseModel):
 
 class PaymentCreateRequest(BaseModel):
     subject: str = Field(..., max_length=128)
+    recharge_days: int = Field(..., ge=0, description="Additional membership days purchased")
     total_amount: Decimal = Field(..., gt=Decimal("0.0"))
     channel: Literal["pc", "wap"] = "pc"
     description: Optional[str] = Field(default=None, max_length=256)
@@ -51,6 +54,7 @@ class PaymentOrderResponse(BaseModel):
 
     out_trade_no: str
     subject: str
+    recharge_days: int
     total_amount: Decimal
     channel: str
     description: Optional[str] = None
