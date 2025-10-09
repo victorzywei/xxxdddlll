@@ -1,9 +1,7 @@
-import json
 import logging
 import os
-from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Iterable, Literal, MutableMapping, Optional
+from typing import Any, Dict, Iterable, MutableMapping, Optional
 
 import requests
 
@@ -13,60 +11,6 @@ from .membership_codec import decode_membership, encode_membership
 logger = logging.getLogger(__name__)
 
 HourString = str
-
-
-@dataclass
-class MembershipRecipe:
-    type: Literal["STACK", "SET_EXPIRY"]
-    duration_days: Optional[int] = None
-    target_expiry_utc: Optional[HourString] = None
-
-    @classmethod
-    def from_payload(cls, payload: Any) -> Optional["MembershipRecipe"]:
-        if not isinstance(payload, MutableMapping):
-            return None
-
-        raw_type = payload.get("type")
-        if not isinstance(raw_type, str):
-            return None
-        normalized_type = raw_type.strip().upper()
-
-        if normalized_type == "STACK":
-            days = payload.get("durationDays")
-            try:
-                days_int = int(days)
-            except (TypeError, ValueError):
-                return None
-            if days_int < 0:
-                return None
-            return cls(type="STACK", duration_days=days_int)
-
-        if normalized_type == "SET_EXPIRY":
-            target = payload.get("targetExpiryUtc")
-            if not isinstance(target, str):
-                return None
-            cleaned = target.strip()
-            if not _is_valid_hour(cleaned):
-                return None
-            return cls(type="SET_EXPIRY", target_expiry_utc=cleaned)
-
-        return None
-
-    def compute_new_expiry(self, *, current_expire: Optional[HourString], now_hour: HourString) -> HourString:
-        base = current_expire if current_expire and current_expire > now_hour else now_hour
-
-        if self.type == "STACK":
-            days = self.duration_days or 0
-            return _add_days_from(base, days)
-
-        if self.type == "SET_EXPIRY":
-            if not self.target_expiry_utc:
-                raise ValueError("target_expiry_utc is required for SET_EXPIRY recipes")
-            if current_expire and self.target_expiry_utc <= current_expire:
-                raise ValueError("expiry must increase")
-            return self.target_expiry_utc
-
-        raise ValueError(f"Unsupported membership recipe type: {self.type}")
 
 
 def update_preferred_username(user_id: str, preferred_username: str, token: str) -> Dict[str, Any]:
@@ -124,11 +68,6 @@ def update_membership_for_order(order: PaymentOrder) -> bool:
         logger.warning("Authing membership secrets not configured; skipping update for order %s.", order.out_trade_no)
         return False
 
-    recipe = _extract_membership_recipe(order)
-    if not recipe:
-        logger.warning("Unable to locate membership recipe for order %s; skip Authing update.", order.out_trade_no)
-        return False
-
     now_hour = _now_utc_hour()
     current_expire: Optional[HourString] = None
 
@@ -144,23 +83,26 @@ def update_membership_for_order(order: PaymentOrder) -> bool:
             )
 
     try:
-        new_expire = recipe.compute_new_expiry(current_expire=current_expire, now_hour=now_hour)
+        recharge_days = int(getattr(order, "recharge_days", 0) or 0)
+    except (TypeError, ValueError):
+        logger.warning("Invalid recharge_days for order %s; treating as 0.", order.out_trade_no)
+        recharge_days = 0
+
+    if recharge_days < 0:
+        logger.warning(
+            "Negative recharge_days=%s for order %s; skip Authing update.",
+            recharge_days,
+            order.out_trade_no,
+        )
+        return False
+
+    base_hour = current_expire if current_expire and current_expire > now_hour else now_hour
+
+    try:
+        new_expire = _add_days_from(base_hour, recharge_days)
     except Exception as exc:  # noqa: BLE001
         logger.error("Unable to compute new membership expiry for order %s: %s", order.out_trade_no, exc)
         return False
-
-    extra_days = max(getattr(order, "recharge_days", 0) or 0, 0)
-    if extra_days:
-        try:
-            new_expire = _add_days_from(new_expire, extra_days)
-        except Exception as exc:  # noqa: BLE001
-            logger.error(
-                "Failed to add recharge_days=%s to expiry for order %s: %s",
-                extra_days,
-                order.out_trade_no,
-                exc,
-            )
-            return False
 
     try:
         new_token = encode_membership("0", "0", now_hour, new_expire, offset_secret, hmac_secret)
@@ -189,36 +131,6 @@ def _read_first(data: MutableMapping[str, Any], keys: Iterable[str]) -> Optional
         value = data.get(key)
         if value:
             return value
-    return None
-
-
-def _extract_membership_recipe(order: PaymentOrder) -> Optional[MembershipRecipe]:
-    candidates: list[Any] = []
-
-    if order.description:
-        try:
-            candidates.append(json.loads(order.description))
-        except json.JSONDecodeError:
-            logger.debug("Order %s description is not JSON; ignoring for membership recipe.", order.out_trade_no)
-
-    user_info = order.user_info or {}
-    if isinstance(user_info, MutableMapping):
-        for key in ("membership_recipe", "membershipRecipe", "membership", "plan", "rec"):
-            value = user_info.get(key)
-            if value:
-                candidates.append(value)
-
-    for candidate in candidates:
-        payload: Any = candidate
-        if isinstance(payload, str):
-            try:
-                payload = json.loads(payload)
-            except json.JSONDecodeError:
-                continue
-        recipe = MembershipRecipe.from_payload(payload)
-        if recipe:
-            return recipe
-
     return None
 
 
