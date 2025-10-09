@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from copy import deepcopy
 from decimal import Decimal
-from typing import Dict, Mapping, Tuple
+from typing import Any, Dict, Mapping, Tuple
 
 from alipay.aop.api.domain.AlipayTradePagePayModel import AlipayTradePagePayModel
 from alipay.aop.api.request.AlipayTradePagePayRequest import AlipayTradePagePayRequest
@@ -70,7 +70,7 @@ def _verify_signature(payload: Mapping[str, str]) -> bool:
     return True
 
 
-def create_payment_order(db: Session, payload: PaymentCreateRequest) -> Dict[str, str]:
+def create_payment_order(db: Session, payload: PaymentCreateRequest) -> Dict[str, Any]:
     try:
         client = get_alipay_client()
     except AlipayConfigurationError as exc:
@@ -114,7 +114,14 @@ def create_payment_order(db: Session, payload: PaymentCreateRequest) -> Dict[str
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail="Failed to create Alipay order.") from exc
 
     logger.info("Created Alipay order out_trade_no=%s channel=%s", order.out_trade_no, payload.channel)
-    return {"out_trade_no": order.out_trade_no, "pay_url": pay_url}
+    return {
+        "out_trade_no": order.out_trade_no,
+        "subject": order.subject,
+        "payment_method": order.payment_method,
+        "created_at": order.created_at,
+        "pay_url": pay_url,
+        "authingpost": order.authingpost,
+    }
 
 
 def get_payment_order(db: Session, out_trade_no: str) -> PaymentOrder:

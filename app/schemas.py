@@ -30,6 +30,10 @@ class PaymentCreateRequest(BaseModel):
 
 class PaymentCreateResponse(BaseModel):
     out_trade_no: str
+    subject: str
+    payment_method: str
+    created_at: datetime
+    authingpost: bool
     pay_url: HttpUrl
 
 
