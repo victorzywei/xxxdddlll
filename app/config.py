@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     alipay_public_key_path: str | None = None
     alipay_app_private_key_pem: str | None = None
     alipay_public_key_pem: str | None = None
+    windows_version_cache_file: Path = Path("/data/cache_latest_windows.json")
+    windows_version_cache_max_age_ms: int = 3 * 60 * 60 * 1000
+    windows_version_fetch_timeout_seconds: int = 5
+    windows_version_sources: List[AnyHttpUrl] = Field(
+        default_factory=lambda: [
+            "http://upyun.8777778.xyz/updates/latest-windows.json",
+            "http://qiniu.8777778.xyz/updates/latest-windows.json",
+            "https://xiaodouli.mirr.qzz.io/updates/latest-windows.json",
+        ]
+    )
 
     def _normalized_base_url(self) -> str:
         """Return base URL without trailing slash for consistent concatenation."""

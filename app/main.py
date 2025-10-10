@@ -18,6 +18,7 @@ from .schemas import (
     PaymentOrderResponse,
 )
 from .services import payment as payment_service
+from .version_cache import router as version_cache_router
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -32,6 +33,8 @@ if origins := settings.cors_origin_list:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+app.include_router(version_cache_router)
 
 
 def _ensure_sqlite_directory() -> None:
