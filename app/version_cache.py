@@ -59,11 +59,14 @@ def _is_fresh(record: Optional[Dict[str, Any]]) -> bool:
 
 
 def _is_valid_payload(payload: Any) -> bool:
-    return (
-        isinstance(payload, dict)
-        and "version" in payload
-        and "url" in payload
-    )
+    if not isinstance(payload, dict) or "version" not in payload:
+        return False
+       
+    # 检查是否有 downloadurl 字段且为非空数组（新格式）
+    if "downloadurl" in payload and isinstance(payload["downloadurl"], list) and len(payload["downloadurl"]) > 0:
+        return True
+    
+    return False
 
 
 async def _fetch_from_sources() -> Optional[Dict[str, Any]]:
@@ -76,6 +79,15 @@ async def _fetch_from_sources() -> Optional[Dict[str, Any]]:
                         continue
                     data = await response.json()
                     if _is_valid_payload(data):
+                        # 如果是新格式（有 downloadurl），转换为旧格式
+                        if "downloadurl" in data and isinstance(data["downloadurl"], list) and len(data["downloadurl"]) > 0:
+                            # 复制数据并添加 url 字段（使用第一个下载链接）
+                            converted_data = dict(data)
+                            converted_data["url"] = data["downloadurl"][0]
+                            # 可选：添加 backupUrls 字段（如果原来没有）
+                            if "backupUrls" not in converted_data and len(data["downloadurl"]) > 1:
+                                converted_data["backupUrls"] = data["downloadurl"][1:]
+                            return converted_data
                         return data
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to fetch %s: %s", url, exc)

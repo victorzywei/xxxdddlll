@@ -46,7 +46,6 @@ class Settings(BaseSettings):
     windows_version_fetch_timeout_seconds: int = 5
     windows_version_sources: List[AnyHttpUrl] = Field(
         default_factory=lambda: [
-            "http://upyun.8777778.xyz/updates/latest-windows.json",
             "http://qiniu.8777778.xyz/updates/latest-windows.json",
             "https://xiaodouli.mirr.qzz.io/updates/latest-windows.json",
         ]
